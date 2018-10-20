@@ -1,0 +1,14 @@
+[package]
+name = "my_bot"
+version = "0.1.0"
+authors = ["Ross MacArthur <macarthur.ross@gmail.com>"]
+
+[dependencies]
+derive_more = "0.12.0"
+failure = "0.1.2"
+log = "0.4.5"
+simplelog = "0.5.3"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.32"
+rand = "0.5.5"
