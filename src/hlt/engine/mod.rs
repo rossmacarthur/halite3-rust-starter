@@ -64,11 +64,6 @@ impl Engine {
         print!("{} ", obj);
     }
 
-    /// Print an arbitrary thing to stdout with a newline, as long as it implements Display.
-    pub fn print_line<T: fmt::Display>(&self, obj: T) {
-        println!("{}", obj);
-    }
-
     /// Read an arbitrary thing from stdin, as long as it implements FromEngine.
     pub fn recv<T: FromEngine>(&mut self) -> Result<T> {
         T::new_from_engine(self)
@@ -82,5 +77,17 @@ impl Engine {
     /// Write something to stdout, as long as it implements ToEngine.
     pub fn send<T: ToEngine>(&self, obj: T) {
         obj.send_to_engine(self)
+    }
+
+    /// Flush the stdout.
+    pub fn flush(&self) {
+        self.send("\n");
+    }
+}
+
+impl Drop for Engine {
+    /// If the Engine still has tokens we want to panic, because something went wrong.
+    fn drop(&mut self) {
+        assert!(self.tokens.is_empty());
     }
 }

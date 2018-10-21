@@ -94,7 +94,10 @@ static mut CONSTANTS: Option<Constants> = None;
 
 /// Set the global constants.
 ///
-/// This can only be called once and this function will panic when called a second time.
+/// # Panics
+///
+/// If this function is called a second time, this function will panic. The constants can only be
+/// set once!
 pub fn set(constants: Constants) {
     unsafe {
         if CONSTANTS.is_some() {
@@ -107,7 +110,10 @@ pub fn set(constants: Constants) {
 
 /// Retrieve a reference to the global constants.
 ///
-/// Panics when constants are accessed before being set.
+/// # Panics
+///
+/// If constants are accessed before being set (i.e. the Game has not started yet), then this
+/// function will panic.
 pub fn get() -> &'static Constants {
     unsafe {
         match CONSTANTS {
@@ -121,8 +127,7 @@ pub fn get() -> &'static Constants {
 mod tests {
     use super::Constants;
     use serde_json;
-
-    #[test]
+     #[test]
     fn test_json_deserialization() {
         let data = r#"{ "CAPTURE_ENABLED": false,
                         "CAPTURE_RADIUS": 3,
@@ -155,8 +160,7 @@ mod tests {
                         "STRICT_ERRORS": false,
                         "game_seed": 1539764156
                     }"#;
-
-        let constants: Constants = serde_json::from_str(data).unwrap();
+         let constants: Constants = serde_json::from_str(data).unwrap();
         assert_eq!(constants.capture_enabled, false);
         assert_eq!(constants.capture_radius, 3);
         assert_eq!(constants.inspired_bonus_multiplier, 2.0);

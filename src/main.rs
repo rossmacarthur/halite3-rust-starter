@@ -32,18 +32,19 @@ fn run() -> Result<()> {
 
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
-    // As soon as you call "ready" function below, the 2 second per turn timer will start
     // ...
     // ...
     // ...
+
+    // This bot is a random bot, so we need a randomizer to pick the ship direction.
+    let mut rng = rand::thread_rng();
+
+    // Call "ready" function below, the 2 second per turn timer will start now.
     game.ready(name);
     info!(
         "Successfully initialized {}! Player ID is {}",
         name, game.my_id
     );
-
-    // This bot is a random bot, so we need a randomizer to pick the ship direction.
-    let mut rng = rand::thread_rng();
 
     loop {
         // Get the updated Game from the Halite engine.
@@ -52,7 +53,7 @@ fn run() -> Result<()> {
         let me = &game.players[&game.my_id];
 
         // Loop through all of my Ships and basically randomly generate the direction.
-        for ship_id in me.ship_ids.iter() {
+        for ship_id in &me.ship_ids {
             let ship = game.ships[ship_id];
             let cell = game.board[ship.position];
 

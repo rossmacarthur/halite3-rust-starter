@@ -178,7 +178,9 @@ impl Game {
 
     /// Let the Halite engine know that we are ready to start playing.
     pub fn ready(&self, name: &str) {
-        Engine::new().print_line(name);
+        let engine = Engine::new();
+        engine.send(name);
+        engine.flush();
     }
 
     /// Update the Game information from the Halite engine.
@@ -191,9 +193,9 @@ impl Game {
     /// End the turn and submit the commands.
     pub fn end_turn(&self) {
         let engine = Engine::new();
-        for command in self.commands.iter() {
+        for command in &self.commands {
             engine.send(command);
         }
-        engine.send("\n");
+        engine.flush();
     }
 }
