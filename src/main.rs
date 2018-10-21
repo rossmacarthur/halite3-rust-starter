@@ -52,7 +52,7 @@ fn run() -> Result<()> {
 
         let me = &game.players[&game.my_id];
 
-        // Loop through all of my Ships and basically randomly generate the direction.
+        // Loop through all of our Ships and basically randomly generate the direction.
         for ship_id in &me.ship_ids {
             let ship = game.ships[ship_id];
             let cell = game.board[ship.position];

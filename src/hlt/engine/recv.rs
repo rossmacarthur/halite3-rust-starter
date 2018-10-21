@@ -98,35 +98,25 @@ impl FromEngine for Player {
 impl FromEngine for Board {
     /// Read the entire game Board from the Engine.
     fn new_from_engine(engine: &mut Engine) -> Result<Self> {
-        let width: usize = engine.next()?;
-        let height: usize = engine.next()?;
+        let width = engine.next()?;
+        let height = engine.next()?;
 
-        let mut cells: Vec<Vec<Cell>> = Vec::with_capacity(height);
-        for y in 0..height {
-            let mut row: Vec<Cell> = Vec::with_capacity(width);
-            for x in 0..width {
-                let halite = engine.next()?;
-                let position = Position {
-                    x: x as isize,
-                    y: y as isize,
-                };
-                row.push(Cell::new(position, halite));
+        let mut board = Board::new(width, height);
+
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                board.cells[y][x].halite = engine.next()?;
             }
-            cells.push(row);
         }
 
-        Ok(Board {
-            width,
-            height,
-            cells,
-        })
+        Ok(board)
     }
 
     /// Update the data in the given Board from the Engine.
     fn update_from_engine(&mut self, engine: &mut Engine) -> Result<()> {
         // Clear all the ship locations.
-        for y in 0..self.height {
-            for x in 0..self.width {
+        for y in 0..self.height as usize {
+            for x in 0..self.width as usize {
                 self.cells[y][x].ship = None;
             }
         }

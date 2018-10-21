@@ -1,7 +1,21 @@
-use std::cmp::Ordering;
 use std::ops::{Add, Index, IndexMut, Sub};
 
 use super::{Direction, DropoffId, Ship, ShipId, ShipyardId};
+
+/// Normalize a value to the given dimension.
+///
+/// This is the euclidean modulo operation.
+fn normalize(value: isize, dimension: isize) -> isize {
+    ((value % dimension) + dimension) % dimension
+}
+
+/// Invert a value around the given dimension.
+///
+/// The result is always the opposite sign to the given value.
+fn invert(value: isize, dimension: isize) -> isize {
+    let value = value % dimension;
+    value + -value.signum() * dimension
+}
 
 /// A point on the Board.
 #[derive(Clone, Constructor, Copy, Debug, Eq, Hash, PartialEq)]
@@ -71,16 +85,6 @@ impl Position {
     }
 }
 
-impl Offset {
-    /// Return the absolute value of this offset.
-    pub fn abs(self) -> Offset {
-        Offset {
-            dx: self.dx.abs(),
-            dy: self.dy.abs(),
-        }
-    }
-}
-
 /// A simple wrapper for something that is either a Shipyard or a Dropoff.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Structure {
@@ -130,25 +134,78 @@ impl Cell {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Board {
     /// The width of the Board.
-    pub width: usize,
+    pub width: isize,
     /// The height of the Board.
-    pub height: usize,
+    pub height: isize,
     /// A list of list of Cells for each Position on the Board.
     pub cells: Vec<Vec<Cell>>,
 }
 
 impl Board {
-    /// Return a new Position normalized to the given Board.
-    pub fn normalize(&self, position: Position) -> Position {
-        let width = self.width as isize;
-        let height = self.height as isize;
-        let x = ((position.x % width) + width) % width;
-        let y = ((position.y % height) + height) % height;
-        Position { x, y }
+    /// Create a new empty Board.
+    pub fn new(width: isize, height: isize) -> Board {
+        let mut cells = Vec::with_capacity(height as usize);
+        for y in 0..height {
+            let mut row = Vec::with_capacity(width as usize);
+            for x in 0..width {
+                row.push(Cell::new(Position::new(x, y), 0));
+            }
+            cells.push(row);
+        }
+        Board {
+            width,
+            height,
+            cells,
+        }
+    }
+
+    /// Return a new Position normalized to the current Board.
+    fn normalize(&self, position: Position) -> Position {
+        Position {
+            x: normalize(position.x, self.width),
+            y: normalize(position.y, self.height),
+        }
+    }
+
+    /// Return a new Offset, with a wrapped X according to the current Board.
+    fn invert_x(&self, offset: Offset) -> Offset {
+        Offset {
+            dx: invert(offset.dx, self.width),
+            dy: offset.dy,
+        }
+    }
+
+    /// Return a new Offset, with a wrapped Y according to the current Board.
+    fn invert_y(&self, offset: Offset) -> Offset {
+        Offset {
+            dx: offset.dx,
+            dy: invert(offset.dy, self.height),
+        }
+    }
+
+    /// Return a new Offset, with both X and Y inverted according to the current Board.
+    fn invert(&self, offset: Offset) -> Offset {
+        self.invert_y(self.invert_x(offset))
+    }
+
+    /// Return the smallest version of an Offset.
+    /// This takes into account each wrapping possibility.
+    fn smallest(&self, offset: Offset) -> Offset {
+        *[
+            self.invert(offset),
+            self.invert_x(offset),
+            self.invert_y(offset),
+            offset,
+        ]
+            .iter()
+            .min_by_key(|o| o.dx.abs() + o.dy.abs())
+            .unwrap()
     }
 
     /// Return the best direction for the given Ship to move to.
-    pub fn naive_navigate(&self, ship: &Ship) -> Option<Direction> {
+    ///
+    /// Naively goes in the Direction of the most halite.
+    pub fn navigate_to_halite(&self, ship: &Ship) -> Option<Direction> {
         let directions = Direction::all();
         let mut cells: Vec<_> = directions
             .iter()
@@ -181,5 +238,125 @@ impl IndexMut<Position> for Board {
     fn index_mut<'a>(&'a mut self, index: Position) -> &'a mut Self::Output {
         let normalized = self.normalize(index);
         &mut self.cells[normalized.y as usize][normalized.x as usize]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize() {
+        assert_eq!(normalize(-5, 10), 5);
+        assert_eq!(normalize(5, 10), 5);
+        assert_eq!(normalize(10, 10), 0);
+    }
+
+    #[test]
+    fn test_invert() {
+        assert_eq!(invert(-12, 10), 8);
+        assert_eq!(invert(-10, 10), 0);
+        assert_eq!(invert(-9, 10), 1);
+        assert_eq!(invert(-5, 10), 5);
+        assert_eq!(invert(0, 10), 0);
+        assert_eq!(invert(1, 10), -9);
+        assert_eq!(invert(5, 10), -5);
+        assert_eq!(invert(10, 10), 0);
+        assert_eq!(invert(19, 10), -1);
+    }
+
+    #[test]
+    fn test_board_normalize() {
+        let board = Board::new(5, 10);
+
+        let input = Position::new(0, 0);
+        assert_eq!(board.normalize(input), input);
+
+        let input = Position::new(4, 9);
+        assert_eq!(board.normalize(input), input);
+
+        let input = Position::new(-3, 12);
+        let output = Position::new(2, 2);
+        assert_eq!(board.normalize(input), output);
+
+        let input = Position::new(12, -3);
+        let output = Position::new(2, 7);
+        assert_eq!(board.normalize(input), output);
+
+        let input = Position::new(-3, -15);
+        let output = Position::new(2, 5);
+        assert_eq!(board.normalize(input), output);
+    }
+
+    #[test]
+    fn test_board_invert_x() {
+        let board = Board::new(5, 10);
+
+        let input = Offset::new(0, 0);
+        assert_eq!(board.invert_x(input), input);
+
+        let input = Offset::new(1, 1);
+        assert_eq!(board.invert_x(input), Offset::new(-4, 1));
+
+        let input = Offset::new(3, 4);
+        assert_eq!(board.invert_x(input), Offset::new(-2, 4));
+    }
+
+    #[test]
+    fn test_board_invert_y() {
+        let board = Board::new(5, 10);
+
+        let input = Offset::new(0, 0);
+        assert_eq!(board.invert_y(input), input);
+
+        let input = Offset::new(1, 1);
+        assert_eq!(board.invert_y(input), Offset::new(1, -9));
+
+        let input = Offset::new(3, 4);
+        assert_eq!(board.invert_y(input), Offset::new(3, -6));
+    }
+
+    #[test]
+    fn test_board_invert() {
+        let board = Board::new(5, 10);
+
+        let input = Offset::new(0, 0);
+        assert_eq!(board.invert(input), input);
+
+        let input = Offset::new(0, 2);
+        let output = Offset::new(0, -8);
+        assert_eq!(board.invert(input), output);
+
+        let input = Offset::new(2, 0);
+        let output = Offset::new(-3, 0);
+        assert_eq!(board.invert(input), output);
+
+        let input = Offset::new(3, 1);
+        let output = Offset::new(-2, -9);
+        assert_eq!(board.invert(input), output);
+    }
+
+    #[test]
+    fn test_board_smallest() {
+        let board = Board::new(5, 5);
+
+        let input = Offset::new(0, 0);
+        assert_eq!(board.smallest(input), input);
+
+        let input = Position::new(3, 2) - Position::new(0, 1);
+        let output = Offset::new(-2, 1);
+        assert_eq!(board.smallest(input), output);
+
+        let input = Position::new(0, 1) - Position::new(3, 2);
+        let output = Offset::new(2, -1);
+        assert_eq!(board.smallest(input), output);
+
+        let input = Position::new(0, 1) - Position::new(3, 2);
+        let output = Offset::new(2, -1);
+        assert_eq!(board.smallest(input), output);
+
+        let input = Position::new(4, 4) - Position::new(0, 0);
+        let output = Offset::new(-1, -1);
+        assert_eq!(board.smallest(input), output);
     }
 }

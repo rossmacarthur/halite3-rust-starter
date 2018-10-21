@@ -127,7 +127,8 @@ pub fn get() -> &'static Constants {
 mod tests {
     use super::Constants;
     use serde_json;
-     #[test]
+
+    #[test]
     fn test_json_deserialization() {
         let data = r#"{ "CAPTURE_ENABLED": false,
                         "CAPTURE_RADIUS": 3,
@@ -160,7 +161,7 @@ mod tests {
                         "STRICT_ERRORS": false,
                         "game_seed": 1539764156
                     }"#;
-         let constants: Constants = serde_json::from_str(data).unwrap();
+        let constants: Constants = serde_json::from_str(data).unwrap();
         assert_eq!(constants.capture_enabled, false);
         assert_eq!(constants.capture_radius, 3);
         assert_eq!(constants.inspired_bonus_multiplier, 2.0);
