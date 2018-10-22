@@ -4,7 +4,7 @@ use std::str;
 
 use serde_json;
 
-use super::super::board::{Board, Cell, Position, Structure};
+use super::super::board::{Board, Position, Structure};
 use super::super::constants::Constants;
 use super::super::{
     Dropoff, DropoffId, Game, Player, PlayerId, Result, Ship, ShipId, Shipyard, ShipyardId,

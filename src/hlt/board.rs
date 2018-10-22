@@ -31,6 +31,71 @@ pub struct Offset {
     pub dy: isize,
 }
 
+impl Offset {
+    /// Return the length of this Offset.
+    fn len(&self) -> usize {
+        (self.dx.abs() + self.dy.abs()) as usize
+    }
+
+    /// Return the unit direction for this Offset.
+    fn signum(self) -> Offset {
+        Offset {
+            dx: self.dx.signum(),
+            dy: self.dy.signum(),
+        }
+    }
+
+    /// Return an Offset with only the X dimension of this Offset.
+    fn dx(self) -> Offset {
+        Offset { dx: self.dx, dy: 0 }
+    }
+
+    /// Return an Offset with only the Y dimension of this Offset.
+    fn dy(self) -> Offset {
+        Offset { dx: 0, dy: self.dy }
+    }
+
+    /// Return an Offset with the X dimension mirrored.
+    fn mirrored_dx(self) -> Offset {
+        Offset {
+            dx: !self.dx,
+            dy: self.dy,
+        }
+    }
+
+    /// Return an Offset with the Y dimension mirrored.
+    fn mirrored_dy(self) -> Offset {
+        Offset {
+            dx: self.dx,
+            dy: !self.dy,
+        }
+    }
+
+    /// Return an Offset with the X inverted around the given dimension.
+    fn inverted_dx(self, width: isize) -> Offset {
+        Offset {
+            dx: invert(self.dx, width),
+            dy: self.dy,
+        }
+    }
+
+    /// Return an Offset with the Y inverted around the given dimension.
+    fn inverted_dy(self, height: isize) -> Offset {
+        Offset {
+            dx: self.dx,
+            dy: invert(self.dy, height),
+        }
+    }
+
+    /// Return an Offset inverted on both axis around the given dimensions.
+    fn inverted(self, width: isize, height: isize) -> Offset {
+        Offset {
+            dx: invert(self.dx, width),
+            dy: invert(self.dy, height),
+        }
+    }
+}
+
 /// A Direction can be easily converted to an Offset.
 impl From<Direction> for Offset {
     fn from(direction: Direction) -> Offset {
@@ -74,6 +139,14 @@ impl Sub<Position> for Position {
 }
 
 impl Position {
+    /// Return a new Position normalized to the given dimensions.
+    pub fn normalized(self, width: isize, height: isize) -> Position {
+        Position {
+            x: normalize(self.x, width),
+            y: normalize(self.y, height),
+        }
+    }
+
     /// Return the 4 adjacent Positions to the current Position.
     pub fn get_surrounding(&self) -> Vec<Position> {
         vec![
@@ -159,42 +232,13 @@ impl Board {
         }
     }
 
-    /// Return a new Position normalized to the current Board.
-    fn normalize(&self, position: Position) -> Position {
-        Position {
-            x: normalize(position.x, self.width),
-            y: normalize(position.y, self.height),
-        }
-    }
-
-    /// Return a new Offset, with a wrapped X according to the current Board.
-    fn invert_x(&self, offset: Offset) -> Offset {
-        Offset {
-            dx: invert(offset.dx, self.width),
-            dy: offset.dy,
-        }
-    }
-
-    /// Return a new Offset, with a wrapped Y according to the current Board.
-    fn invert_y(&self, offset: Offset) -> Offset {
-        Offset {
-            dx: offset.dx,
-            dy: invert(offset.dy, self.height),
-        }
-    }
-
-    /// Return a new Offset, with both X and Y inverted according to the current Board.
-    fn invert(&self, offset: Offset) -> Offset {
-        self.invert_y(self.invert_x(offset))
-    }
-
     /// Return the smallest version of an Offset.
     /// This takes into account each wrapping possibility.
     fn smallest(&self, offset: Offset) -> Offset {
         *[
-            self.invert(offset),
-            self.invert_x(offset),
-            self.invert_y(offset),
+            offset.inverted(self.width, self.height),
+            offset.inverted_dx(self.width),
+            offset.inverted_dy(self.height),
             offset,
         ]
             .iter()
@@ -228,7 +272,7 @@ impl Index<Position> for Board {
     type Output = Cell;
 
     fn index<'a>(&'a self, index: Position) -> &'a Self::Output {
-        let normalized = self.normalize(index);
+        let normalized = index.normalized(self.width, self.height);
         &self.cells[normalized.y as usize][normalized.x as usize]
     }
 }
@@ -236,7 +280,7 @@ impl Index<Position> for Board {
 /// Allow indexing the Board with Positions.
 impl IndexMut<Position> for Board {
     fn index_mut<'a>(&'a mut self, index: Position) -> &'a mut Self::Output {
-        let normalized = self.normalize(index);
+        let normalized = index.normalized(self.width, self.height);
         &mut self.cells[normalized.y as usize][normalized.x as usize]
     }
 }
@@ -266,74 +310,76 @@ mod tests {
     }
 
     #[test]
-    fn test_board_normalize() {
-        let board = Board::new(5, 10);
+    fn test_position_normalized() {
+        let width = 5;
+        let height = 10;
 
         let input = Position::new(0, 0);
-        assert_eq!(board.normalize(input), input);
+        assert_eq!(input.normalized(width, height), input);
 
         let input = Position::new(4, 9);
-        assert_eq!(board.normalize(input), input);
+        assert_eq!(input.normalized(width, height), input);
 
         let input = Position::new(-3, 12);
         let output = Position::new(2, 2);
-        assert_eq!(board.normalize(input), output);
+        assert_eq!(input.normalized(width, height), output);
 
         let input = Position::new(12, -3);
         let output = Position::new(2, 7);
-        assert_eq!(board.normalize(input), output);
+        assert_eq!(input.normalized(width, height), output);
 
         let input = Position::new(-3, -15);
         let output = Position::new(2, 5);
-        assert_eq!(board.normalize(input), output);
+        assert_eq!(input.normalized(width, height), output);
     }
 
     #[test]
-    fn test_board_invert_x() {
-        let board = Board::new(5, 10);
+    fn test_offset_inverted_dx() {
+        let width = 5;
 
         let input = Offset::new(0, 0);
-        assert_eq!(board.invert_x(input), input);
+        assert_eq!(input.inverted_dx(width), input);
 
         let input = Offset::new(1, 1);
-        assert_eq!(board.invert_x(input), Offset::new(-4, 1));
+        assert_eq!(input.inverted_dx(width), Offset::new(-4, 1));
 
         let input = Offset::new(3, 4);
-        assert_eq!(board.invert_x(input), Offset::new(-2, 4));
+        assert_eq!(input.inverted_dx(width), Offset::new(-2, 4));
     }
 
     #[test]
-    fn test_board_invert_y() {
-        let board = Board::new(5, 10);
+    fn test_offset_inverted_dy() {
+        let height = 10;
 
         let input = Offset::new(0, 0);
-        assert_eq!(board.invert_y(input), input);
+        assert_eq!(input.inverted_dy(height), input);
 
         let input = Offset::new(1, 1);
-        assert_eq!(board.invert_y(input), Offset::new(1, -9));
+        assert_eq!(input.inverted_dy(height), Offset::new(1, -9));
 
         let input = Offset::new(3, 4);
-        assert_eq!(board.invert_y(input), Offset::new(3, -6));
+        assert_eq!(input.inverted_dy(height), Offset::new(3, -6));
     }
 
     #[test]
-    fn test_board_invert() {
-        let board = Board::new(5, 10);
+    fn test_offset_inverted() {
+        let width = 5;
+        let height = 10;
 
         let input = Offset::new(0, 0);
-        assert_eq!(board.invert(input), input);
+        assert_eq!(input.inverted(width, height), input);
 
         let input = Offset::new(0, 2);
         let output = Offset::new(0, -8);
-        assert_eq!(board.invert(input), output);
+        assert_eq!(input.inverted(width, height), output);
 
         let input = Offset::new(2, 0);
         let output = Offset::new(-3, 0);
-        assert_eq!(board.invert(input), output);
+        assert_eq!(input.inverted(width, height), output);
 
         let input = Offset::new(3, 1);
         let output = Offset::new(-2, -9);
-        assert_eq!(board.invert(input), output);
+        assert_eq!(input.inverted(width, height), output);
     }
 
     #[test]
