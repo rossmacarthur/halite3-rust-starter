@@ -23,19 +23,21 @@ where
 impl<'a> ToEngine for &'a Command {
     /// Send a Command to the engine.
     fn send_to_engine(&self, engine: &Engine) {
-        engine.print(match self {
-            Command::Spawn => format!("g"),
-            Command::ToDropoff(ship_id) => format!("c {}", ship_id),
-            Command::Action(ship_id, action) => {
-                let c = match action {
-                    Action::Move(Direction::North) => 'n',
-                    Action::Move(Direction::East) => 'e',
-                    Action::Move(Direction::South) => 's',
-                    Action::Move(Direction::West) => 'w',
-                    Action::Collect => 'o',
-                };
-                format!("m {} {}", ship_id, c)
-            }
-        })
+        engine.print(
+            match self {
+                Command::Spawn => format!("g"),
+                Command::ToDropoff(ship_id) => format!("c {}", ship_id),
+                Command::Action(ship_id, action) => {
+                    let c = match action {
+                        Action::Move(Direction::North) => 'n',
+                        Action::Move(Direction::East) => 'e',
+                        Action::Move(Direction::South) => 's',
+                        Action::Move(Direction::West) => 'w',
+                        Action::Collect => 'o',
+                    };
+                    format!("m {} {}", ship_id, c)
+                }
+            } + " ",
+        )
     }
 }

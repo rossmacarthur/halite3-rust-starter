@@ -5,12 +5,14 @@ pub mod util;
 
 use std::collections::HashMap;
 
-use self::board::{Board, Position};
+pub use self::board::{Board, Position};
 use self::engine::Engine;
-use self::util::Result;
+pub use self::util::Result;
 
 /// A Player identifier.
-#[derive(Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, PartialEq)]
+#[derive(
+    Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, Ord, PartialEq, PartialOrd,
+)]
 pub struct PlayerId(usize);
 
 /// A Player in the Game.
@@ -42,7 +44,9 @@ impl Player {
 }
 
 /// A Dropoff identifier.
-#[derive(Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, PartialEq)]
+#[derive(
+    Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, Ord, PartialEq, PartialOrd,
+)]
 pub struct DropoffId(usize);
 
 /// A Dropoff in the Game.
@@ -57,7 +61,9 @@ pub struct Dropoff {
 }
 
 /// A Shipyard identifier.
-#[derive(Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, PartialEq)]
+#[derive(
+    Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, Ord, PartialEq, PartialOrd,
+)]
 pub struct ShipyardId(usize);
 
 // A Shipyard in the Game.
@@ -72,7 +78,9 @@ pub struct Shipyard {
 }
 
 /// A Ship identifier.
-#[derive(Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, PartialEq)]
+#[derive(
+    Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, Ord, PartialEq, PartialOrd,
+)]
 pub struct ShipId(usize);
 
 /// A ship in the Game.
@@ -89,6 +97,16 @@ pub struct Ship {
 }
 
 impl Ship {
+    /// Create a new Ship.
+    pub fn new(id: ShipId, player_id: PlayerId, position: Position, halite: usize) -> Ship {
+        Ship {
+            id,
+            player_id,
+            position,
+            halite,
+        }
+    }
+
     /// Return whether the Ship has reached max halite carrying capacity.
     pub fn is_full(&self) -> bool {
         self.halite >= constants::get().max_halite
@@ -169,6 +187,11 @@ impl Game {
         }
     }
 
+    /// Return our Player.
+    pub fn me(&self) -> &Player {
+        &self.players[&self.my_id]
+    }
+
     /// Start a new Game.
     pub fn start() -> Result<Self> {
         let mut engine = Engine::new();
@@ -188,6 +211,35 @@ impl Game {
         Engine::new().update(self)?;
         info!("=============== TURN {} ================", self.turn);
         Ok(())
+    }
+
+    /// Spawn a Ship at the Shipyard.
+    ///
+    /// This adds the Ship to the Board, so that we can use it when considering collisions.
+    pub fn spawn_ship(&mut self) {
+        let id = if let Some(ship_id) = self.ships.keys().max() {
+            ShipId::new(ship_id.0 + 1)
+        } else {
+            ShipId::new(0)
+        };
+        let position = self.me().shipyard.position;
+        let ship = Ship::new(id, self.my_id, position, 0);
+        self.board.add_ship(&ship);
+        self.ships.insert(ship.id, ship);
+        self.commands.push(Command::Spawn);
+    }
+
+    /// Move a Ship in the given Direction.
+    pub fn move_ship(&mut self, ship: &mut Ship, direction: Direction) {
+        self.board.move_ship(ship, direction);
+        let command = Command::Action(ship.id, Action::Move(direction));
+        self.commands.push(command);
+    }
+
+    /// Make a Ship collect halite in its current location.
+    pub fn collect_halite(&mut self, ship: &Ship) {
+        let command = Command::Action(ship.id, Action::Collect);
+        self.commands.push(command);
     }
 
     /// End the turn and submit the commands.

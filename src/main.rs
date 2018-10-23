@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate derive_more;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;

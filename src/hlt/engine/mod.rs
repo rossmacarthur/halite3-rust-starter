@@ -61,7 +61,7 @@ impl Engine {
 
     /// Print an arbitrary thing to stdout, as long as it implements Display.
     pub fn print<T: fmt::Display>(&self, obj: T) {
-        print!("{} ", obj);
+        print!("{}", obj);
     }
 
     /// Read an arbitrary thing from stdin, as long as it implements FromEngine.

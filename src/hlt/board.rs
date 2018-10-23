@@ -1,6 +1,6 @@
 use std::ops::{Add, Index, IndexMut, Sub};
 
-use super::{Direction, DropoffId, Ship, ShipId, ShipyardId};
+use super::{Direction, DropoffId, Result, Ship, ShipId, ShipyardId};
 
 /// Normalize a value to the given dimension.
 ///
@@ -33,12 +33,12 @@ pub struct Offset {
 
 impl Offset {
     /// Return the length of this Offset.
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         (self.dx.abs() + self.dy.abs()) as usize
     }
 
     /// Return the unit direction for this Offset.
-    fn signum(self) -> Offset {
+    pub fn signum(self) -> Offset {
         Offset {
             dx: self.dx.signum(),
             dy: self.dy.signum(),
@@ -46,41 +46,66 @@ impl Offset {
     }
 
     /// Return an Offset with only the X dimension of this Offset.
-    fn dx(self) -> Offset {
+    pub fn dx(self) -> Offset {
         Offset { dx: self.dx, dy: 0 }
     }
 
     /// Return an Offset with only the Y dimension of this Offset.
-    fn dy(self) -> Offset {
+    pub fn dy(self) -> Offset {
         Offset { dx: 0, dy: self.dy }
     }
 
     /// Return an Offset with the X dimension mirrored.
-    fn mirrored_dx(self) -> Offset {
+    pub fn mirrored_dx(self) -> Offset {
         Offset {
-            dx: !self.dx,
+            dx: -self.dx,
             dy: self.dy,
         }
     }
 
     /// Return an Offset with the Y dimension mirrored.
-    fn mirrored_dy(self) -> Offset {
+    pub fn mirrored_dy(self) -> Offset {
         Offset {
             dx: self.dx,
-            dy: !self.dy,
+            dy: -self.dy,
         }
     }
 
     /// Return an Offset with the X inverted around the given dimension.
-    fn inverted_dx(self, width: isize) -> Offset {
+    pub fn inverted_dx(self, width: isize) -> Offset {
         Offset {
             dx: invert(self.dx, width),
             dy: self.dy,
         }
     }
 
+    /// Reduce an Offset to the smallest possible version, taking into account dimensions.
+    pub fn reduce(self, width: isize, height: isize) -> Offset {
+        *[
+            self.inverted(width, height),
+            self.inverted_dx(width),
+            self.inverted_dy(height),
+            self,
+        ]
+            .iter()
+            .min_by_key(|o| o.len())
+            .unwrap()
+    }
+
+    /// Return a Direction for this Offset.
+    fn into_direction(self) -> Result<Direction> {
+        let offset = self.signum();
+        match (offset.dx, offset.dy) {
+            (0, -1) => Ok(Direction::North),
+            (1, 0) => Ok(Direction::East),
+            (0, 1) => Ok(Direction::South),
+            (-1, 0) => Ok(Direction::West),
+            _ => Err(format_err!("unable to convert {:?} to Direction", self)),
+        }
+    }
+
     /// Return an Offset with the Y inverted around the given dimension.
-    fn inverted_dy(self, height: isize) -> Offset {
+    pub fn inverted_dy(self, height: isize) -> Offset {
         Offset {
             dx: self.dx,
             dy: invert(self.dy, height),
@@ -88,7 +113,7 @@ impl Offset {
     }
 
     /// Return an Offset inverted on both axis around the given dimensions.
-    fn inverted(self, width: isize, height: isize) -> Offset {
+    pub fn inverted(self, width: isize, height: isize) -> Offset {
         Offset {
             dx: invert(self.dx, width),
             dy: invert(self.dy, height),
@@ -148,7 +173,7 @@ impl Position {
     }
 
     /// Return the 4 adjacent Positions to the current Position.
-    pub fn get_surrounding(&self) -> Vec<Position> {
+    pub fn surrounding(&self) -> Vec<Position> {
         vec![
             *self + Direction::North,
             *self + Direction::East,
@@ -232,18 +257,17 @@ impl Board {
         }
     }
 
-    /// Return the smallest version of an Offset.
-    /// This takes into account each wrapping possibility.
-    fn smallest(&self, offset: Offset) -> Offset {
-        *[
-            offset.inverted(self.width, self.height),
-            offset.inverted_dx(self.width),
-            offset.inverted_dy(self.height),
-            offset,
-        ]
-            .iter()
-            .min_by_key(|o| o.dx.abs() + o.dy.abs())
-            .unwrap()
+    /// Add a new Ship to the Board.
+    pub fn add_ship(&mut self, ship: &Ship) {
+        self[ship.position].ship = Some(ship.id);
+    }
+
+    /// Move an existing Ship.
+    pub fn move_ship(&mut self, ship: &mut Ship, direction: Direction) {
+        let position = ship.position + direction;
+        self[ship.position].ship = None;
+        self[position].ship = Some(ship.id);
+        ship.position = position;
     }
 
     /// Return the best direction for the given Ship to move to.
@@ -255,7 +279,7 @@ impl Board {
             .iter()
             .map(|d| (d, self[ship.position + *d]))
             .collect();
-        cells.sort_by(|a, b| b.1.halite.cmp(&a.1.halite));
+        cells.sort_by_key(|(_, c)| !c.halite);
 
         for (direction, cell) in cells {
             if !cell.is_occupied() {
@@ -307,6 +331,28 @@ mod tests {
         assert_eq!(invert(5, 10), -5);
         assert_eq!(invert(10, 10), 0);
         assert_eq!(invert(19, 10), -1);
+    }
+
+    #[test]
+    fn test_position_plus_offset() {
+        let position = Position::new(2, 3);
+        let offset = Offset::new(3, 4);
+        assert_eq!(position + offset, Position::new(5, 7));
+
+        let position = Position::new(2, 3);
+        let offset = Offset::new(3, -4);
+        assert_eq!(position + offset, Position::new(5, -1));
+    }
+
+    #[test]
+    fn test_position_minus_position() {
+        let position_a = Position::new(2, 3);
+        let position_b = Position::new(5, 7);
+        assert_eq!(position_b - position_a, Offset::new(3, 4));
+
+        let position_a = Position::new(2, 3);
+        let position_b = Position::new(5, -1);
+        assert_eq!(position_b - position_a, Offset::new(3, -4));
     }
 
     #[test]
@@ -383,26 +429,51 @@ mod tests {
     }
 
     #[test]
-    fn test_board_smallest() {
-        let board = Board::new(5, 5);
+    fn test_offset_mirrored_dx() {
+        let input = Offset::new(0, 0);
+        assert_eq!(input.mirrored_dx(), input);
+
+        let input = Offset::new(1, 1);
+        assert_eq!(input.mirrored_dx(), Offset::new(-1, 1));
+
+        let input = Offset::new(3, 4);
+        assert_eq!(input.mirrored_dx(), Offset::new(-3, 4));
+    }
+
+    #[test]
+    fn test_offset_mirrored_dy() {
+        let input = Offset::new(0, 0);
+        assert_eq!(input.mirrored_dy(), input);
+
+        let input = Offset::new(1, 1);
+        assert_eq!(input.mirrored_dy(), Offset::new(1, -1));
+
+        let input = Offset::new(3, 4);
+        assert_eq!(input.mirrored_dy(), Offset::new(3, -4));
+    }
+
+    #[test]
+    fn test_offset_reduce() {
+        let width = 5;
+        let height = 5;
 
         let input = Offset::new(0, 0);
-        assert_eq!(board.smallest(input), input);
+        assert_eq!(input.reduce(width, height), input);
 
         let input = Position::new(3, 2) - Position::new(0, 1);
         let output = Offset::new(-2, 1);
-        assert_eq!(board.smallest(input), output);
+        assert_eq!(input.reduce(width, height), output);
 
         let input = Position::new(0, 1) - Position::new(3, 2);
         let output = Offset::new(2, -1);
-        assert_eq!(board.smallest(input), output);
+        assert_eq!(input.reduce(width, height), output);
 
         let input = Position::new(0, 1) - Position::new(3, 2);
         let output = Offset::new(2, -1);
-        assert_eq!(board.smallest(input), output);
+        assert_eq!(input.reduce(width, height), output);
 
         let input = Position::new(4, 4) - Position::new(0, 0);
         let output = Offset::new(-1, -1);
-        assert_eq!(board.smallest(input), output);
+        assert_eq!(input.reduce(width, height), output);
     }
 }

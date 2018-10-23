@@ -1,4 +1,4 @@
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Constants {
     #[serde(rename = "CAPTURE_ENABLED")]
     pub capture_enabled: bool,
