@@ -159,60 +159,72 @@ impl FromEngine for Game {
     fn update_from_engine(&mut self, engine: &mut Engine) -> Result<()> {
         self.turn = engine.recv()?;
 
+        // Clone the old Ships and Dropoffs from the previous frame.
+        // This is so we can keep state in Ships and Dropoffs if we so wish.
+        let mut old_ships = self.ships.clone();
+        let mut old_dropoffs = self.dropoffs.clone();
+
+        // Clear all of these because we will reconstruct these.
         self.ships.clear();
         self.dropoffs.clear();
         self.commands.clear();
 
         for _ in 0..self.players.len() {
+            // Read the player ID and get the corresponding Player.
             let player_id = engine.recv()?;
             let mut player = self.players.get_mut(&player_id).ok_or(EngineParseError)?;
-
-            // Clear the current ship and dropoffs for the player because they could have all
-            // changed.
 
             let ship_count = engine.recv()?;
             let dropoff_count = engine.recv()?;
             player.halite = engine.recv()?;
 
+            // Update the Ships.
             player.ship_ids.clear();
             for _ in 0..ship_count {
                 let id = engine.recv()?;
                 let position = engine.recv()?;
                 let halite = engine.recv()?;
-                let ship = Ship {
-                    id,
-                    player_id,
-                    position,
-                    halite,
+
+                let ship = if let Some(ship) = old_ships.get_mut(&id) {
+                    ship.position = position;
+                    ship.halite = halite;
+                    *ship
+                } else {
+                    Ship::new(id, player_id, position, halite)
                 };
-                player.ship_ids.push(id);
+
                 self.ships.insert(id, ship);
+                player.ship_ids.push(id);
             }
 
+            // Update the Dropoffs.
             player.dropoff_ids.clear();
             for _ in 0..dropoff_count {
                 let id = engine.recv()?;
                 let position = engine.recv()?;
-                let dropoff = Dropoff {
-                    id,
-                    player_id,
-                    position,
+
+                let dropoff = if let Some(dropoff) = old_dropoffs.get_mut(&id) {
+                    dropoff.position = position;
+                    *dropoff
+                } else {
+                    Dropoff::new(id, player_id, position)
                 };
-                player.dropoff_ids.push(id);
+
                 self.dropoffs.insert(id, dropoff);
+                player.dropoff_ids.push(id);
             }
         }
 
         engine.update(&mut self.board)?;
 
         for player in self.players.values() {
+            let shipyard = &player.shipyard;
+            self.board[shipyard.position].structure = Some(Structure::Shipyard(shipyard.id));
+
             for ship_id in &player.ship_ids {
                 let ship = &self.ships[ship_id];
                 self.board[ship.position].ship = Some(*ship_id);
             }
-
-            let shipyard = &player.shipyard;
-            self.board[shipyard.position].structure = Some(Structure::Shipyard(shipyard.id));
 
             for dropoff_id in &player.dropoff_ids {
                 let dropoff = &self.dropoffs[dropoff_id];

@@ -60,6 +60,13 @@ pub struct Dropoff {
     pub position: Position,
 }
 
+impl Dropoff {
+    /// Create a new Dropoff.
+    pub fn new(id: DropoffId, player_id: PlayerId, position: Position) -> Dropoff {
+        Dropoff { id, player_id, position }
+    }
+}
+
 /// A Shipyard identifier.
 #[derive(
     Clone, Constructor, Copy, Debug, Display, Eq, From, Hash, Into, Ord, PartialEq, PartialOrd,
