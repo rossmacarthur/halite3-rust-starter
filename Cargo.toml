@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Ross MacArthur <macarthur.ross@gmail.com>"]
 
 [dependencies]
+clap = "2.32.0"
 derive_more = "0.12.0"
 failure = "0.1.2"
 log = "0.4.5"

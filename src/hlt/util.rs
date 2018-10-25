@@ -3,24 +3,17 @@ use simplelog;
 
 use std::fs;
 
-use super::{constants, PlayerId};
-
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 /// Configure the global logger.
-pub fn configure_logger(name: &str, my_id: PlayerId) -> Result<()> {
+pub fn configure_logger(filename: &str) -> Result<()> {
     // Setup a simple log file.
     let log_config = simplelog::Config {
         time: None,
         target: None,
         ..Default::default()
     };
-    let log_file = fs::File::create(format!(
-        "{}-{}-{}.log",
-        name,
-        constants::get().game_seed,
-        my_id
-    ))?;
+    let log_file = fs::File::create(filename)?;
     let _ = simplelog::WriteLogger::init(simplelog::LevelFilter::Debug, log_config, log_file);
 
     Ok(())

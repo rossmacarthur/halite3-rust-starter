@@ -1,4 +1,6 @@
 #[macro_use]
+extern crate clap;
+#[macro_use]
 extern crate derive_more;
 #[macro_use]
 extern crate failure;
@@ -15,21 +17,48 @@ mod hlt;
 
 use std::process;
 
+use clap::{App, Arg};
 use rand::Rng;
 
 use hlt::util::{configure_logger, pretty_error, Result};
 use hlt::*;
 
 fn run() -> Result<()> {
+    // Parse command line arguments.
+    let cli = App::new(crate_name!())
+        .version(crate_version!())
+        .about("\nMy Halite III bot. See https://halite.io.")
+        .arg(
+            Arg::with_name("debug")
+                .short("-d")
+                .long("--debug")
+                .help("Whether to enable logging"),
+        ).arg(
+            Arg::with_name("filename")
+                .short("-l")
+                .long("--log-file")
+                .takes_value(true)
+                .help("Override the name of the log file"),
+        ).arg(
+            Arg::with_name("name")
+                .short("-n")
+                .long("--name")
+                .takes_value(true)
+                .help("Override the name of the bot"),
+        ).get_matches();
+
     // The name of our bot.
-    let name = "MyBot";
+    let name = cli.value_of("name").unwrap_or("MyBot");
 
     // Start a new Game, by reading the game information from the Halite engine.
     let mut game = Game::start()?;
 
     // Configure the logger, so that we can use debug! and other log macros.
     // It will log to a file called "MyBot-<game-seed>-<my-id>.log"
-    configure_logger(name, game.my_id)?;
+    if cli.is_present("debug") {
+        let log_filename = format!("{}-{}-{}.log", name, constants::get().game_seed, game.my_id);
+        configure_logger(cli.value_of("filename").unwrap_or(&log_filename))?;
+    }
 
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
