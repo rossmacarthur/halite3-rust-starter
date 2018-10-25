@@ -48,7 +48,8 @@ fn run() -> Result<()> {
         ).get_matches();
 
     // The name of our bot.
-    let name = cli.value_of("name").unwrap_or("MyBot");
+    let default_name = format!("MyBot-{}", crate_version!());
+    let name = cli.value_of("name").unwrap_or(&default_name);
 
     // Start a new Game, by reading the game information from the Halite engine.
     let mut game = Game::start()?;
