@@ -63,7 +63,11 @@ pub struct Dropoff {
 impl Dropoff {
     /// Create a new Dropoff.
     pub fn new(id: DropoffId, player_id: PlayerId, position: Position) -> Dropoff {
-        Dropoff { id, player_id, position }
+        Dropoff {
+            id,
+            player_id,
+            position,
+        }
     }
 }
 
@@ -141,24 +145,17 @@ impl Direction {
     }
 }
 
-/// An action that a Ship can make.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Action {
-    /// Stay still and collect ~25% of the halite at the location.
-    Collect,
-    /// Move 1 unit in the given direction.
-    Move(Direction),
-}
-
 /// A command that can be given to the Halite engine.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Command {
     /// Spawn a new Ship!
     Spawn,
     /// Convert the given Ship to a Dropoff.
-    ToDropoff(ShipId),
-    /// Perform the given Action for the given Ship.
-    Action(ShipId, Action),
+    ConvertToDropoff(ShipId),
+    /// Make the given Ship stay still and collect ~25% of the halite in its current location.
+    Collect(ShipId),
+    /// Move the given Ship 1 unit in the given direction.
+    Move(ShipId, Direction),
 }
 
 /// The core Game struct.
@@ -239,13 +236,13 @@ impl Game {
     /// Move a Ship in the given Direction.
     pub fn move_ship(&mut self, ship: &mut Ship, direction: Direction) {
         self.board.move_ship(ship, direction);
-        let command = Command::Action(ship.id, Action::Move(direction));
+        let command = Command::Move(ship.id, direction);
         self.commands.push(command);
     }
 
     /// Make a Ship collect halite in its current location.
     pub fn collect_halite(&mut self, ship: &Ship) {
-        let command = Command::Action(ship.id, Action::Collect);
+        let command = Command::Collect(ship.id);
         self.commands.push(command);
     }
 

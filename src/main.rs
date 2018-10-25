@@ -89,9 +89,9 @@ fn run() -> Result<()> {
 
             let command = if cell.halite < constants::get().max_halite / 10 || ship.is_full() {
                 let random_direction = Direction::all()[rng.gen_range(0, 4)];
-                Command::Action(ship.id, Action::Move(random_direction))
+                Command::Move(ship.id, random_direction)
             } else {
-                Command::Action(ship.id, Action::Collect)
+                Command::Collect(ship.id)
             };
 
             game.commands.push(command);

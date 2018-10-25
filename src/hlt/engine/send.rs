@@ -2,7 +2,7 @@ use std::fmt;
 
 use super::Engine;
 
-use super::super::{Action, Command, Direction};
+use super::super::{Command, Direction};
 
 /// A trait for sending types to the Halite engine.
 pub trait ToEngine {
@@ -26,17 +26,18 @@ impl<'a> ToEngine for &'a Command {
         engine.print(
             match self {
                 Command::Spawn => format!("g"),
-                Command::ToDropoff(ship_id) => format!("c {}", ship_id),
-                Command::Action(ship_id, action) => {
-                    let c = match action {
-                        Action::Move(Direction::North) => 'n',
-                        Action::Move(Direction::East) => 'e',
-                        Action::Move(Direction::South) => 's',
-                        Action::Move(Direction::West) => 'w',
-                        Action::Collect => 'o',
-                    };
-                    format!("m {} {}", ship_id, c)
-                }
+                Command::ConvertToDropoff(ship_id) => format!("c {}", ship_id),
+                Command::Collect(ship_id) => format!("m {} o", ship_id),
+                Command::Move(ship_id, direction) => format!(
+                    "m {} {}",
+                    ship_id,
+                    match direction {
+                        Direction::North => 'n',
+                        Direction::East => 'e',
+                        Direction::South => 's',
+                        Direction::West => 'w',
+                    }
+                ),
             } + " ",
         )
     }
