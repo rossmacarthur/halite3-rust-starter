@@ -81,31 +81,27 @@ fn run() -> Result<()> {
         // Get the updated Game from the Halite engine.
         game.update()?;
 
-        let me = &game.players[&game.my_id];
+        // Get our Player.
+        let me = game.me().clone();
 
-        // Loop through all of our Ships and basically randomly generate the direction.
-        for ship_id in &me.ship_ids {
-            let ship = game.ships[ship_id];
+        // Loop through all of our Ships and randomly generate the direction.
+        for ship_id in me.ship_ids {
+            let ship = game.ships[&ship_id];
             let cell = game.board[ship.position];
 
-            let command = if cell.halite < constants::get().max_halite / 10 || ship.is_full() {
-                let random_direction = Direction::all()[rng.gen_range(0, 4)];
-                Command::Move(ship.id, random_direction)
+            if cell.halite < constants::get().max_halite / 10 || ship.is_full() {
+                game.move_ship(ship_id, Direction::all()[rng.gen_range(0, 4)]);
             } else {
-                Command::Collect(ship.id)
-            };
-
-            game.commands.push(command);
+                game.collect_halite(ship_id);
+            }
         }
-
-        let shipyard_cell = game.board[me.shipyard.position];
 
         // If we have enough halite, spawn a new ship!
         if game.turn <= 400
             && me.halite >= constants::get().new_entity_halite_cost
-            && !shipyard_cell.is_occupied()
+            && !game.board[me.shipyard.position].is_occupied()
         {
-            game.commands.push(Command::Spawn);
+            game.spawn_ship();
         }
 
         game.end_turn();

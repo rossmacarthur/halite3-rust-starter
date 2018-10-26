@@ -1,6 +1,6 @@
 use std::ops::{Add, Index, IndexMut, Sub};
 
-use super::{Direction, DropoffId, Result, Ship, ShipId, ShipyardId};
+use super::{Direction, DropoffId, Result, ShipId, ShipyardId};
 
 /// Normalize a value to the given dimension.
 ///
@@ -256,54 +256,21 @@ impl Board {
             cells,
         }
     }
-
-    /// Add a new Ship to the Board.
-    pub fn add_ship(&mut self, ship: &Ship) {
-        self[ship.position].ship = Some(ship.id);
-    }
-
-    /// Move an existing Ship.
-    pub fn move_ship(&mut self, ship: &mut Ship, direction: Direction) {
-        let position = ship.position + direction;
-        self[ship.position].ship = None;
-        self[position].ship = Some(ship.id);
-        ship.position = position;
-    }
-
-    /// Return the best direction for the given Ship to move to.
-    ///
-    /// Naively goes in the Direction of the most halite.
-    pub fn navigate_to_halite(&self, ship: &Ship) -> Option<Direction> {
-        let directions = Direction::all();
-        let mut cells: Vec<_> = directions
-            .iter()
-            .map(|d| (d, self[ship.position + *d]))
-            .collect();
-        cells.sort_by_key(|(_, c)| !c.halite);
-
-        for (direction, cell) in cells {
-            if !cell.is_occupied() {
-                return Some(*direction);
-            }
-        }
-
-        None
-    }
 }
 
 /// Allow indexing the Board with Positions.
 impl Index<Position> for Board {
     type Output = Cell;
 
-    fn index<'a>(&'a self, index: Position) -> &'a Self::Output {
+    fn index(&self, index: Position) -> &Self::Output {
         let normalized = index.normalized(self.width, self.height);
         &self.cells[normalized.y as usize][normalized.x as usize]
     }
 }
 
-/// Allow indexing the Board with Positions.
+/// Allow mutably indexing the Board with Positions.
 impl IndexMut<Position> for Board {
-    fn index_mut<'a>(&'a mut self, index: Position) -> &'a mut Self::Output {
+    fn index_mut(&mut self, index: Position) -> &mut Self::Output {
         let normalized = index.normalized(self.width, self.height);
         &mut self.cells[normalized.y as usize][normalized.x as usize]
     }

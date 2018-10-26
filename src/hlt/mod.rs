@@ -191,6 +191,21 @@ impl Game {
         }
     }
 
+    /// Return a mutable reference to a Player.
+    pub fn get_player(&self, player_id: PlayerId) -> Option<&Player> {
+        self.players.get(&player_id)
+    }
+
+    /// Return a mutable reference to a Ship.
+    pub fn get_ship(&self, ship_id: ShipId) -> Option<&Ship> {
+        self.ships.get(&ship_id)
+    }
+
+    /// Return a mutable reference to a Dropoff.
+    pub fn get_dropoff(&self, dropoff_id: DropoffId) -> Option<&Dropoff> {
+        self.dropoffs.get(&dropoff_id)
+    }
+
     /// Return our Player.
     pub fn me(&self) -> &Player {
         &self.players[&self.my_id]
@@ -219,30 +234,82 @@ impl Game {
 
     /// Spawn a Ship at the Shipyard.
     ///
-    /// This adds the Ship to the Board, so that we can use it when considering collisions.
+    /// This does not just tell the engine that we want to spawn a new Ship, it also adds a new Ship
+    /// to the Board, so that we can use it when considering collisions.
     pub fn spawn_ship(&mut self) {
+        // Add a new Ship with the next possible ShipId number. This should not be relied upon,
+        // because it could change on the next frame.
         let id = if let Some(ship_id) = self.ships.keys().max() {
             ShipId::new(ship_id.0 + 1)
         } else {
             ShipId::new(0)
         };
+
+        // The Shipyard position is always where Ships are spawned.
         let position = self.me().shipyard.position;
+
+        // Create a new Ship!
         let ship = Ship::new(id, self.my_id, position, 0);
-        self.board.add_ship(&ship);
+
+        // Add the Ship to the Board.
+        self.board[position].ship = Some(ship.id);
+
+        // Insert the new Ship into our list of Ships.
         self.ships.insert(ship.id, ship);
+
+        // Finally add the Spawn command to tell the engine that we want to spawn a new Ship.
         self.commands.push(Command::Spawn);
     }
 
+    /// Return the best direction for the given Ship to move to.
+    ///
+    /// Naively goes in the Direction of the most halite.
+    pub fn navigate_to_halite(&self, ship_id: ShipId) -> Option<Direction> {
+        // Get the specified Ship.
+        let ship = self.ships[&ship_id];
+
+        // Get the surrounding and current Cells.
+        let mut cells: Vec<_> = Direction::all()
+            .iter()
+            .map(|d| (Some(*d), self.board[ship.position + *d]))
+            .collect();
+        cells.push((None, self.board[ship.position]));
+
+        // Order Cells from least halite to most halite.
+        cells.sort_by_key(|(_, c)| !c.halite);
+
+        // Loop through Cells and return the first unoccupied one.
+        for (direction, cell) in cells {
+            if !cell.is_occupied() {
+                return direction;
+            }
+        }
+        None
+    }
+
     /// Move a Ship in the given Direction.
-    pub fn move_ship(&mut self, ship: &mut Ship, direction: Direction) {
-        self.board.move_ship(ship, direction);
-        let command = Command::Move(ship.id, direction);
-        self.commands.push(command);
+    pub fn move_ship(&mut self, ship_id: ShipId, direction: Direction) {
+        // Get the specified Ship.
+        let ship = self
+            .ships
+            .get_mut(&ship_id)
+            .expect(&format!("ship {} does not exist", ship_id));
+
+        // Compute the resultant position.
+        let position = ship.position + direction;
+
+        // Update the Board and Ship with the new Position.
+        self.board[ship.position].ship = None;
+        self.board[position].ship = Some(ship_id);
+        ship.position = position;
+
+        // Finally add the Move command to tell the engine that we want to move the Ship.
+        self.commands.push(Command::Move(ship_id, direction));
     }
 
     /// Make a Ship collect halite in its current location.
-    pub fn collect_halite(&mut self, ship: &Ship) {
-        let command = Command::Collect(ship.id);
+    pub fn collect_halite(&mut self, ship_id: ShipId) {
+        let command = Command::Collect(ship_id);
         self.commands.push(command);
     }
 
